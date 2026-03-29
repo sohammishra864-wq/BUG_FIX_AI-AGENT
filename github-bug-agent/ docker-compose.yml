@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+
+  mcp_server:
+    build: ./mcp_server
+    container_name: github-mcp_server
+    ports:
+      - "8081:8080"
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  adk_agent:
+    build: ./adk_agent
+    container_name: github-bug-agent
+    ports:
+      - "8080:8080"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - MCP_SERVER_URL=http://mcp_server:8080/sse
+    depends_on:
+      - mcp_server
