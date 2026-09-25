@@ -1,17 +1,10 @@
-# connects to github mcp server and does coding bug fixes
-
 import os
 from google.adk.agents import Agent
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, SseServerParams
 
-# MCP Server connection
 MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8081/sse")
 
 def _get_auth_headers() -> dict:
-    """
-    Returns IAM identity token headers for service-to-service Cloud Run calls.
-    Falls back silently to empty dict for local development.
-    """
     try:
         import urllib.request
         audience = MCP_SERVER_URL.replace("/sse", "")
@@ -27,7 +20,6 @@ def _get_auth_headers() -> dict:
         return {}
 
 
-# ── System Instruction ─────────────────────────────────────────────────────────
 SYSTEM_INSTRUCTION = """
 You are a senior software engineer specializing in debugging and code review.
 You have deep expertise in Python, JavaScript, and common software defects.
@@ -51,17 +43,31 @@ STEP 3 → Call `get_file_content` on relevant files
          Read every file mentioned in the issue or logically related to it.
          Read at least 1–3 files before forming any hypothesis.
          NEVER suggest a fix without reading real code first.
+         Prioritize: files named in stack traces > files mentioned in the issue >
+         files in the same directory as mentioned files > test files.
 
 STEP 4 → Generate your fix in the EXACT output format below.
 
 STEP 5 → Ask the user: "Would you like me to post this fix as a GitHub comment?"
          If yes → call `post_fix_comment` with the formatted fix.
 
+══════════════════════════════
+ERROR RECOVERY
+══════════════════════════════
+
+If a tool returns a JSON response with "error": true, handle it:
+- RATE_LIMITED → Tell the user to wait ~60 seconds. Do not retry immediately.
+- NOT_FOUND / FILE_NOT_FOUND → Use `list_repo_files` to find the correct path, then retry.
+- BINARY_FILE → Skip the file, look for a different relevant source file.
+- CONFIG_ERROR → Tell the user to check their GITHUB_TOKEN setup.
+- PATH_IS_DIRECTORY → Read the hint and call `list_repo_files` on that path instead.
+Never give up on the first error — adapt and try an alternative path.
+
 ══════════════════════════════════════════════════
 STRICT OUTPUT FORMAT — use this structure always
 ══════════════════════════════════════════════════
 
-## 🔍 Bug Analysis
+## Bug Analysis
 
 **Issue:** [One-line summary of what is broken]
 
@@ -75,7 +81,7 @@ STRICT OUTPUT FORMAT — use this structure always
 
 ---
 
-## 🛠️ Fix
+## Fix
 
 ```[language]
 # BEFORE (buggy code)
@@ -89,7 +95,7 @@ STRICT OUTPUT FORMAT — use this structure always
 
 ---
 
-## 📋 Implementation Steps
+## Implementation Steps
 
 1. Open `[filename]` and locate `[function/line reference]`
 2. Replace [specific thing] with [specific thing]
@@ -97,7 +103,7 @@ STRICT OUTPUT FORMAT — use this structure always
 
 ---
 
-## ✅ Testing
+## Testing
 
 - [ ] [Specific test case that reproduces the original bug]
 - [ ] [Test case that confirms the fix works]
@@ -115,23 +121,13 @@ ENGINEERING PRINCIPLES
   "Missing null check before dereferencing optional return value" is a root cause.
 - Be precise. Name exact files, functions, and line numbers when possible.
 - Be concise. One clear fix beats three vague suggestions.
+- Do NOT repeat entire file contents in your response — quote only the relevant lines.
 - If the issue is ambiguous or the bug cannot be determined from available code,
   state exactly what additional information or files you need — do not fabricate a fix.
 - If the repo has no relevant code visible (e.g. octocat/Hello-World), honestly
   acknowledge this and explain what a real fix workflow would look like.
-
-══════════════════════════════
-AVAILABLE MCP TOOLS
-══════════════════════════════
-
-- `list_repo_issues`   → list open issues filtered by label (default: "bug")
-- `get_issue_details`  → full issue body + all comments + labels + metadata
-- `list_repo_files`    → explore repo directory structure
-- `get_file_content`   → read a specific file from the repo
-- `post_fix_comment`   → post your formatted fix as a GitHub comment
 """
 
-# Agent
 root_agent = Agent(
     name="github_bug_fixer",
     model="gemini-2.0-flash",
