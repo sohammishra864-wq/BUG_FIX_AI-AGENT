@@ -1,14 +1,5 @@
-"""
-FastAPI entrypoint for the GitHub Bug Fixing ADK Agent.
-Serves the ADK web UI and a REST API for interaction.
-"""
-
 import os
 import uvicorn
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
-
 from google.adk.cli.fast_api import get_fast_api_app
 
 AGENT_DIR = os.path.dirname(__file__)
@@ -22,7 +13,6 @@ app = get_fast_api_app(
 
 @app.get("/health")
 async def health():
-    """Health check for Cloud Run."""
     return {"status": "ok", "agent": "github-bug-fixer"}
 
 
