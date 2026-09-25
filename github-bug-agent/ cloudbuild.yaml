@@ -33,16 +33,16 @@ steps:
     args:
       - build
       - -t
-      - "${_REPO_PREFIX}/github-mcp_server:$SHORT_SHA"
+      - "${_REPO_PREFIX}/github-mcp-server:$SHORT_SHA"
       - -t
-      - "${_REPO_PREFIX}/github-mcp_server:latest"
+      - "${_REPO_PREFIX}/github-mcp-server:latest"
       - ./mcp_server
 
   # ── 3. Push MCP Server image ───────────────────────────────────────────────
   - name: "gcr.io/cloud-builders/docker"
     id: "push-mcp"
     waitFor: ["build-mcp"]
-    args: ["push", "--all-tags", "${_REPO_PREFIX}/github-mcp_server"]
+    args: ["push", "--all-tags", "${_REPO_PREFIX}/github-mcp-server"]
 
   # ── 4. Deploy MCP Server to Cloud Run ─────────────────────────────────────
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
@@ -52,8 +52,8 @@ steps:
     args:
       - run
       - deploy
-      - github-mcp_server
-      - --image=${_REPO_PREFIX}/github-mcp_server:$SHORT_SHA
+      - github-mcp-server
+      - --image=${_REPO_PREFIX}/github-mcp-server:$SHORT_SHA
       - --region=${_REGION}
       - --no-allow-unauthenticated
       - --set-secrets=GITHUB_TOKEN=${_GITHUB_SECRET}:latest
